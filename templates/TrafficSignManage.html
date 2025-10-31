@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Traffic Sign Model Management</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f5f5f5;
+      }
+      h1 {
+        color: #333;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+      }
+      th {
+        background-color: #4caf50;
+        color: white;
+        font-weight: bold;
+      }
+      tr:hover {
+        background-color: #f5f5f5;
+      }
+
+      button {
+        background-color: #008cba;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: background 0.3s;
+        margin-right: 5px;
+      }
+      button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      button:hover:not(:disabled) {
+        background-color: #006b8f;
+      }
+
+      button.test-btn {
+        background-color: #ff9800;
+      }
+      button.test-btn:hover:not(:disabled) {
+        background-color: #e68900;
+      }
+
+      /* Progress Section */
+      .progress-section {
+        margin-top: 20px;
+        padding: 20px;
+        border: 2px solid #4caf50;
+        border-radius: 8px;
+        background-color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .progress-section.test-mode {
+        border-color: #ff9800;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 30px;
+        background-color: #e0e0e0;
+        border-radius: 15px;
+        overflow: hidden;
+        margin: 15px 0;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50, #45a049);
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      .progress-fill.test-mode {
+        background: linear-gradient(90deg, #ff9800, #e68900);
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .metric-box {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #4caf50;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .metric-box.test-mode {
+        border-left-color: #ff9800;
+      }
+
+      .metric-box strong {
+        display: block;
+        color: #666;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+
+      .metric-box span {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+      }
+
+      #result {
+        margin-top: 20px;
+        padding: 20px;
+        border: 2px solid #2196f3;
+        border-radius: 8px;
+        background-color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      #result h3 {
+        color: #2196f3;
+        margin-top: 0;
+      }
+      #result p {
+        margin: 8px 0;
+        font-size: 14px;
+      }
+      #result button {
+        background-color: #4caf50;
+        margin-top: 10px;
+      }
+      #result button:hover {
+        background-color: #45a049;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .status-text {
+        color: #666;
+        font-size: 16px;
+        margin: 10px 0;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+
+      .spinner.test-mode {
+        border-top-color: #ff9800;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Test Images Preview */
+      .test-images {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .test-image-item {
+        position: relative;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+      }
+
+      .test-image-item img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+      }
+
+      .test-image-item .image-info {
+        padding: 8px;
+        font-size: 12px;
+        background: #f9f9f9;
+      }
+
+      .test-image-item.processing {
+        border-color: #ff9800;
+      }
+
+      .test-image-item.done {
+        border-color: #4caf50;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚦 Traffic Sign Model Management</h1>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Version</th>
+          <th>Precision</th>
+          <th>Recall</th>
+          <th>F1 Score</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in models %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>v{{ m.version }}</td>
+          <td>{{ "%.4f"|format(m.pre) }}</td>
+          <td>{{ "%.4f"|format(m.recall) }}</td>
+          <td>{{ "%.4f"|format(m.f1_score) }}</td>
+          <td>
+            {% if m.is_active %}
+            <span style="color: green">✓ Active</span>
+            {% else %}
+            <span style="color: gray">○ Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <button onclick="retrain()" id="retrainBtn">🔄 Retrain</button>
+            <button
+              onclick="testModel('{{ m.path }}')"
+              class="test-btn"
+              id="testBtn"
+            >
+              🧪 Test
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Training Progress Section -->
+    <div id="trainingProgress" class="progress-section hidden">
+      <h3>⚙️ Training in Progress</h3>
+      <p class="status-text">
+        <span class="spinner"></span>
+        <span id="trainStatusText">Initializing...</span>
+      </p>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="trainProgressBar" style="width: 0%">
+          0%
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric-box">
+          <strong>📊 PRECISION</strong>
+          <span id="livePrec">-</span>
+        </div>
+        <div class="metric-box">
+          <strong>🎯 RECALL</strong>
+          <span id="liveRecall">-</span>
+        </div>
+        <div class="metric-box">
+          <strong>📈 mAP50</strong>
+          <span id="liveMap">-</span>
+        </div>
+        <div class="metric-box">
+          <strong>💥 LOSS</strong>
+          <span id="liveLoss">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Testing Progress Section -->
+    <div id="testingProgress" class="progress-section test-mode hidden">
+      <h3>🧪 Testing in Progress</h3>
+      <p class="status-text">
+        <span class="spinner test-mode"></span>
+        <span id="testStatusText">Loading test images...</span>
+      </p>
+
+      <div class="progress-bar">
+        <div
+          class="progress-fill test-mode"
+          id="testProgressBar"
+          style="width: 0%"
+        >
+          0%
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric-box test-mode">
+          <strong>📷 IMAGES PROCESSED</strong>
+          <span id="testProcessed">0</span>
+        </div>
+        <div class="metric-box test-mode">
+          <strong>🎯 DETECTIONS</strong>
+          <span id="testDetections">0</span>
+        </div>
+        <div class="metric-box test-mode">
+          <strong>⚡ AVG CONFIDENCE</strong>
+          <span id="testConfidence">-</span>
+        </div>
+        <div class="metric-box test-mode">
+          <strong>⏱️ AVG TIME</strong>
+          <span id="testTime">-</span>
+        </div>
+      </div>
+
+      <h4 style="margin-top: 20px">📸 Test Images:</h4>
+      <div class="test-images" id="testImages"></div>
+    </div>
+
+    <!-- Training Result Section -->
+    <div id="result" class="hidden">
+      <h3>✅ Training Complete!</h3>
+      <p><b>Model Name:</b> <span id="modelName"></span></p>
+      <p><b>Version:</b> <span id="modelVersion"></span></p>
+      <p><b>Precision:</b> <span id="modelPrecision"></span></p>
+      <p><b>Recall:</b> <span id="modelRecall"></span></p>
+      <p><b>F1 Score (mAP50):</b> <span id="modelF1"></span></p>
+      <p>
+        <b>Path:</b> <span id="modelPath" style="word-break: break-all"></span>
+      </p>
+      <button onclick="saveModel()">💾 Save Model to Database</button>
+    </div>
+
+    <!-- Test Result Section -->
+    <div id="testResult" class="hidden">
+      <h3>✅ Testing Complete!</h3>
+      <p><b>Total Images:</b> <span id="testTotalImages"></span></p>
+      <p><b>Total Detections:</b> <span id="testTotalDetections"></span></p>
+      <p><b>Average Confidence:</b> <span id="testAvgConfidence"></span></p>
+      <p><b>Average Inference Time:</b> <span id="testAvgTime"></span></p>
+      <button onclick="closeTestResult()">Close</button>
+    </div>
+
+    <script>
+      let currentModel = null;
+      let eventSource = null;
+
+      function retrain() {
+        const btn = document.getElementById("retrainBtn");
+        btn.disabled = true;
+        btn.innerText = "⏳ Training...";
+
+        // Hide all sections
+        document.getElementById("trainingProgress").classList.remove("hidden");
+        document.getElementById("testingProgress").classList.add("hidden");
+        document.getElementById("result").classList.add("hidden");
+        document.getElementById("testResult").classList.add("hidden");
+
+        // Reset progress
+        document.getElementById("trainProgressBar").style.width = "0%";
+        document.getElementById("trainProgressBar").innerText = "0%";
+        document.getElementById("trainStatusText").innerText =
+          "Starting training...";
+
+        fetch("/retrain", { method: "POST" })
+          .then((r) => r.json())
+          .then(() => {
+            eventSource = new EventSource("/training_progress");
+
+            eventSource.onmessage = function (event) {
+              const data = JSON.parse(event.data);
+
+              if (data.type === "status") {
+                document.getElementById("trainStatusText").innerText =
+                  data.message;
+              } else if (data.type === "progress") {
+                const percent = Math.round(
+                  (data.epoch / data.total_epochs) * 100
+                );
+                document.getElementById("trainProgressBar").style.width =
+                  percent + "%";
+                document.getElementById(
+                  "trainProgressBar"
+                ).innerText = `${percent}%`;
+
+                document.getElementById(
+                  "trainStatusText"
+                ).innerText = `Training Epoch ${data.epoch}/${data.total_epochs}`;
+
+                document.getElementById("livePrec").innerText =
+                  data.precision.toFixed(4);
+                document.getElementById("liveRecall").innerText =
+                  data.recall.toFixed(4);
+                document.getElementById("liveMap").innerText =
+                  data.mAP50.toFixed(4);
+                document.getElementById("liveLoss").innerText =
+                  data.loss.toFixed(4);
+              } else if (data.type === "complete") {
+                currentModel = data.model;
+
+                document
+                  .getElementById("trainingProgress")
+                  .classList.add("hidden");
+                document.getElementById("result").classList.remove("hidden");
+
+                document.getElementById("modelName").innerText =
+                  data.model.name;
+                document.getElementById("modelVersion").innerText =
+                  "v" + data.model.version;
+                document.getElementById("modelPrecision").innerText =
+                  data.model.precision.toFixed(4);
+                document.getElementById("modelRecall").innerText =
+                  data.model.recall.toFixed(4);
+                document.getElementById("modelF1").innerText =
+                  data.model.f1_score.toFixed(4);
+                document.getElementById("modelPath").innerText =
+                  data.model.path;
+
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerText = "🔄 Retrain";
+              } else if (data.type === "error") {
+                alert("❌ Training error: " + data.message);
+                document
+                  .getElementById("trainingProgress")
+                  .classList.add("hidden");
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerText = "🔄 Retrain";
+              }
+            };
+
+            eventSource.onerror = function () {
+              console.error("SSE connection error");
+              eventSource.close();
+              btn.disabled = false;
+              btn.innerText = "🔄 Retrain";
+            };
+          })
+          .catch((err) => {
+            alert("Error starting training: " + err);
+            btn.disabled = false;
+            btn.innerText = "🔄 Retrain";
+          });
+      }
+
+      function testModel(modelPath) {
+        const btn = document.getElementById("testBtn");
+        btn.disabled = true;
+        btn.innerText = "⏳ Testing...";
+
+        // Hide all sections
+        document.getElementById("testingProgress").classList.remove("hidden");
+        document.getElementById("trainingProgress").classList.add("hidden");
+        document.getElementById("result").classList.add("hidden");
+        document.getElementById("testResult").classList.add("hidden");
+
+        // Reset progress
+        document.getElementById("testProgressBar").style.width = "0%";
+        document.getElementById("testProgressBar").innerText = "0%";
+        document.getElementById("testStatusText").innerText =
+          "Loading test images...";
+        document.getElementById("testImages").innerHTML = "";
+
+        fetch("/test_model", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model_path: modelPath }),
+        })
+          .then((r) => r.json())
+          .then(() => {
+            eventSource = new EventSource("/test_progress");
+
+            eventSource.onmessage = function (event) {
+              const data = JSON.parse(event.data);
+
+              if (data.type === "status") {
+                document.getElementById("testStatusText").innerText =
+                  data.message;
+              } else if (data.type === "progress") {
+                const percent = Math.round((data.current / data.total) * 100);
+                document.getElementById("testProgressBar").style.width =
+                  percent + "%";
+                document.getElementById(
+                  "testProgressBar"
+                ).innerText = `${percent}%`;
+
+                document.getElementById(
+                  "testStatusText"
+                ).innerText = `Processing image ${data.current}/${data.total}`;
+
+                document.getElementById("testProcessed").innerText =
+                  data.current;
+                document.getElementById("testDetections").innerText =
+                  data.total_detections;
+                document.getElementById("testConfidence").innerText =
+                  data.avg_confidence.toFixed(2);
+                document.getElementById("testTime").innerText =
+                  data.avg_time.toFixed(3) + "s";
+
+                // Add image preview
+                if (data.image_path) {
+                  addTestImage(
+                    data.image_path,
+                    data.detections,
+                    data.current === data.total
+                  );
+                }
+              } else if (data.type === "complete") {
+                document
+                  .getElementById("testingProgress")
+                  .classList.add("hidden");
+                document
+                  .getElementById("testResult")
+                  .classList.remove("hidden");
+
+                document.getElementById("testTotalImages").innerText =
+                  data.total_images;
+                document.getElementById("testTotalDetections").innerText =
+                  data.total_detections;
+                document.getElementById("testAvgConfidence").innerText =
+                  data.avg_confidence.toFixed(2);
+                document.getElementById("testAvgTime").innerText =
+                  data.avg_time.toFixed(3) + "s";
+
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerText = "🧪 Test";
+              } else if (data.type === "error") {
+                alert("❌ Testing error: " + data.message);
+                document
+                  .getElementById("testingProgress")
+                  .classList.add("hidden");
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerText = "🧪 Test";
+              }
+            };
+
+            eventSource.onerror = function () {
+              console.error("SSE connection error");
+              eventSource.close();
+              btn.disabled = false;
+              btn.innerText = "🧪 Test";
+            };
+          })
+          .catch((err) => {
+            alert("Error starting test: " + err);
+            btn.disabled = false;
+            btn.innerText = "🧪 Test";
+          });
+      }
+
+      function addTestImage(imagePath, detections, isDone) {
+        const container = document.getElementById("testImages");
+        const imageDiv = document.createElement("div");
+        imageDiv.className =
+          "test-image-item " + (isDone ? "done" : "processing");
+
+        imageDiv.innerHTML = `
+        <img src="/test_image/${encodeURIComponent(
+          imagePath
+        )}" alt="Test image">
+        <div class="image-info">
+          <div><strong>Detections:</strong> ${detections}</div>
+          <div style="font-size: 10px; color: #666;">${imagePath
+            .split("/")
+            .pop()}</div>
+        </div>
+      `;
+
+        container.appendChild(imageDiv);
+
+        // Auto scroll to bottom
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function saveModel() {
+        if (!currentModel) {
+          alert("No model to save!");
+          return;
+        }
+
+        fetch("/save_model", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentModel),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            alert("✅ " + data.message);
+            location.reload();
+          })
+          .catch((err) => {
+            alert("❌ Error saving model: " + err);
+          });
+      }
+
+      function closeTestResult() {
+        document.getElementById("testResult").classList.add("hidden");
+        location.reload();
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TrafficSignDetection - Admin Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #f1f5f9;
+        margin: 0;
+      }
+      .sidebar {
+        width: 230px;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: #0d6efd;
+        color: #fff;
+        padding-top: 1rem;
+        z-index: 1000;
+      }
+      .sidebar h4 {
+        padding-left: 20px;
+        margin-bottom: 1.5rem;
+      }
+      .sidebar a {
+        color: #fff;
+        text-decoration: none;
+        display: block;
+        padding: 10px 20px;
+        margin: 4px 0;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+      .sidebar a:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .sidebar .submenu {
+        padding-left: 20px;
+      }
+      .navbar-custom {
+        margin-left: 230px;
+        background: #ffffff;
+        border-bottom: 1px solid #dee2e6;
+        z-index: 900;
+      }
+      .navbar-custom .navbar-brand {
+        color: #0d6efd;
+        font-weight: 600;
+      }
+      .content {
+        margin-left: 230px;
+        padding: 40px;
+      }
+      table th {
+        background-color: #0d6efd;
+        color: white;
+        text-align: center;
+      }
+      table td {
+        text-align: center;
+      }
+      .modal-header {
+        background-color: #0d6efd;
+        color: white;
+      }
+      .image-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+      }
+      .image-item {
+        position: relative;
+      }
+      .image-item img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 2px solid transparent;
+        cursor: pointer;
+      }
+      .image-item input[type="checkbox"] {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        transform: scale(1.2);
+        z-index: 10;
+      }
+      .image-item.selected img {
+        border-color: #0d6efd;
+      }
+      .training-log {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+      }
+      .training-log p {
+        margin: 3px 0;
+        color: #495057;
+      }
+      .training-log .epoch-line {
+        color: #0d6efd;
+        font-weight: 600;
+      }
+      .training-log .metric-line {
+        color: #28a745;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h4>Manage</h4>
+      <a href="/home.html">Home</a>
+      <a
+        class="dropdown-toggle"
+        data-bs-toggle="collapse"
+        href="#trafficMenu"
+        role="button"
+        >Traffic Sign Manage</a
+      >
+      <div class="collapse submenu" id="trafficMenu">
+        <a href="model.html?type=sign">➤ ManageModel</a>
+      </div>
+
+      <a
+        class="dropdown-toggle"
+        data-bs-toggle="collapse"
+        href="#charMenu"
+        role="button"
+        >Character Manage</a
+      >
+      <div class="collapse submenu" id="charMenu">
+        <a href="model.html?type=char">➤ ManageModel</a>
+      </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light navbar-custom">
+      <div class="container-fluid">
+        <span class="navbar-brand">TrafficSignDetection</span>
+        <div class="ms-auto d-flex align-items-center">
+          <span class="me-3">Dang Quan Bao</span>
+          <a href="/logout" class="btn btn-primary btn-sm">Logout</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="content">
+      <h3 id="pageTitle" class="mb-4"></h3>
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>Model Name</th>
+            <th>Precision</th>
+            <th>Recall</th>
+            <th>F1 Score</th>
+            <th>Version</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="modelTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Retrain Modal - Step 1: Select Dataset -->
+    <div
+      class="modal fade"
+      id="retrainModal"
+      tabindex="-1"
+      aria-labelledby="retrainModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="retrainModalLabel">
+              Retrain Model - Select Dataset
+            </h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div
+              id="loadingDataset"
+              class="text-center mb-3"
+              style="display: none"
+            >
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading dataset from cloud...</p>
+            </div>
+            <form id="retrainForm">
+              <div class="mb-3">
+                <label class="form-label">Select Images to Train</label>
+                <div class="mb-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    id="selectAllBtn"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    id="deselectAllBtn"
+                  >
+                    Deselect All
+                  </button>
+                  <span class="ms-3 text-muted" id="selectedCount"
+                    >0 images selected</span
+                  >
+                </div>
+                <div class="image-grid" id="imageGrid"></div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Upload Label File (.txt)</label>
+                <input
+                  type="file"
+                  class="form-control"
+                  id="labelFile"
+                  accept=".txt"
+                />
+                <small class="form-text text-muted"
+                  >Required: YOLO format label file</small
+                >
+              </div>
+              <button
+                type="button"
+                class="btn btn-primary w-100"
+                id="startRetrainBtn"
+              >
+                Start Retraining
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retraining Progress Modal -->
+    <div
+      class="modal fade"
+      id="retrainingModal"
+      tabindex="-1"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Retraining Model</h5>
+          </div>
+          <div class="modal-body">
+            <div class="text-center mb-3">
+              <div
+                class="spinner-border text-primary mb-3"
+                role="status"
+                style="width: 3rem; height: 3rem"
+              >
+                <span class="visually-hidden">Retraining...</span>
+              </div>
+              <p id="retrainingStatus">Initializing training process...</p>
+            </div>
+            <div class="progress mb-3" style="height: 25px">
+              <div
+                class="progress-bar progress-bar-striped progress-bar-animated"
+                id="retrainProgress"
+                role="progressbar"
+                style="width: 0%"
+              >
+                0%
+              </div>
+            </div>
+            <div class="training-log" id="trainingLog">
+              <p class="text-muted">Waiting for training to start...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal fade" id="resultModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Retraining Complete</h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-success">
+              <h6 class="alert-heading">✓ Model retrained successfully!</h6>
+              <hr />
+              <div id="retrainResults">
+                <div class="row">
+                  <div class="col-md-6">
+                    <p class="mb-2">
+                      <strong>Model Name:</strong>
+                      <span id="newModelName">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Version:</strong> <span id="newVersion">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Precision:</strong>
+                      <span id="newPrecision">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Recall:</strong> <span id="newRecall">-</span>
+                    </p>
+                  </div>
+                  <div class="col-md-6">
+                    <p class="mb-2">
+                      <strong>F1 Score (mAP50):</strong>
+                      <span id="newF1">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Sample Quantity:</strong>
+                      <span id="sampleQty">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Dataset ID:</strong> <span id="datasetId">-</span>
+                    </p>
+                    <p class="mb-2">
+                      <strong>Model Path:</strong><br />
+                      <small class="text-muted" id="modelPath">-</small>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" id="saveModelBtn">
+              Save Model
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      const type = urlParams.get("type") || "sign";
+
+      const pageTitle = document.getElementById("pageTitle");
+      pageTitle.textContent =
+        type === "sign"
+          ? "Traffic Sign Model Management"
+          : "Character Model Management";
+
+      // API endpoints
+      const API_BASE = "";
+      const API_ENDPOINTS = {
+        getModels: "/manage_model",
+        getDataset: "/get_dataset",
+        retrain: "/retrain",
+        saveModel: "/save_model",
+      };
+
+      let currentTrainedModel = null;
+      let retrainModal, retrainingModal, resultModal;
+
+      // Initialize page
+      async function initPage() {
+        await loadModels();
+        initializeModals();
+      }
+
+      // Load models from backend
+      async function loadModels() {
+        try {
+          const response = await fetch(API_ENDPOINTS.getModels);
+          const models = await response.json();
+
+          const tableBody = document.getElementById("modelTableBody");
+          tableBody.innerHTML = "";
+
+          models.forEach((model, index) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${model.name}</td>
+              <td>${(model.pre * 100).toFixed(1)}%</td>
+              <td>${(model.recall * 100).toFixed(1)}%</td>
+              <td>${(model.f1_score * 100).toFixed(1)}%</td>
+              <td>v${model.version}</td>
+              <td>
+                <button class="btn btn-sm btn-primary retrain-btn" data-model="${
+                  model.name
+                }" data-index="${index}">
+                  Retrain
+                </button>
+              </td>
+            `;
+            tableBody.appendChild(row);
+          });
+
+          attachRetrainListeners();
+        } catch (error) {
+          console.error("Error loading models:", error);
+          alert("Failed to load models. Please refresh the page.");
+        }
+      }
+
+      // Initialize Bootstrap modals
+      function initializeModals() {
+        retrainModal = new bootstrap.Modal(
+          document.getElementById("retrainModal")
+        );
+        retrainingModal = new bootstrap.Modal(
+          document.getElementById("retrainingModal")
+        );
+        resultModal = new bootstrap.Modal(
+          document.getElementById("resultModal")
+        );
+      }
+
+      // Attach retrain button listeners
+      function attachRetrainListeners() {
+        document.querySelectorAll(".retrain-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const modelName = e.target.dataset.model;
+            await loadDatasetAndShowModal(modelName);
+          });
+        });
+      }
+
+      // Load dataset from backend
+      async function loadDatasetAndShowModal(modelName) {
+        const loadingDiv = document.getElementById("loadingDataset");
+        const imageGrid = document.getElementById("imageGrid");
+
+        imageGrid.innerHTML = "";
+        loadingDiv.style.display = "block";
+        retrainModal.show();
+
+        try {
+          const response = await fetch(API_ENDPOINTS.getDataset);
+          const data = await response.json();
+
+          loadingDiv.style.display = "none";
+
+          // Display images from dataset
+          if (data.images && data.images.length > 0) {
+            data.images.forEach((img, i) => {
+              const div = document.createElement("div");
+              div.classList.add("image-item");
+              div.innerHTML = `
+                <input type="checkbox" id="img${i}" class="image-checkbox" data-path="${img}" />
+                <label for="img${i}">
+                  <img src="${img}" alt="sample${i}" />
+                </label>
+              `;
+              imageGrid.appendChild(div);
+            });
+          } else {
+            imageGrid.innerHTML =
+              '<p class="text-muted">No images available in dataset</p>';
+          }
+
+          updateSelectedCount();
+          attachCheckboxListeners();
+        } catch (error) {
+          console.error("Error loading dataset:", error);
+          loadingDiv.style.display = "none";
+          alert("Failed to load dataset from cloud.");
+        }
+      }
+
+      // Attach checkbox listeners
+      function attachCheckboxListeners() {
+        document.querySelectorAll(".image-checkbox").forEach((checkbox) => {
+          checkbox.addEventListener("change", (e) => {
+            const parent = e.target.closest(".image-item");
+            if (e.target.checked) {
+              parent.classList.add("selected");
+            } else {
+              parent.classList.remove("selected");
+            }
+            updateSelectedCount();
+          });
+        });
+      }
+
+      // Select/Deselect all buttons
+      document.getElementById("selectAllBtn").addEventListener("click", () => {
+        document.querySelectorAll(".image-checkbox").forEach((cb) => {
+          cb.checked = true;
+          cb.closest(".image-item").classList.add("selected");
+        });
+        updateSelectedCount();
+      });
+
+      document
+        .getElementById("deselectAllBtn")
+        .addEventListener("click", () => {
+          document.querySelectorAll(".image-checkbox").forEach((cb) => {
+            cb.checked = false;
+            cb.closest(".image-item").classList.remove("selected");
+          });
+          updateSelectedCount();
+        });
+
+      function updateSelectedCount() {
+        const count = document.querySelectorAll(
+          ".image-checkbox:checked"
+        ).length;
+        document.getElementById(
+          "selectedCount"
+        ).textContent = `${count} images selected`;
+      }
+
+      // Start retraining
+      document
+        .getElementById("startRetrainBtn")
+        .addEventListener("click", async () => {
+          const labelFile = document.getElementById("labelFile").files[0];
+          const selectedCheckboxes = document.querySelectorAll(
+            ".image-checkbox:checked"
+          );
+
+          if (selectedCheckboxes.length === 0) {
+            alert("Please select at least one image!");
+            return;
+          }
+
+          if (!labelFile) {
+            alert("Please upload a label file!");
+            return;
+          }
+
+          // Prepare form data
+          const formData = new FormData();
+          formData.append("label_file", labelFile);
+
+          const selectedImages = Array.from(selectedCheckboxes).map(
+            (cb) => cb.dataset.path
+          );
+          formData.append("selected_images", JSON.stringify(selectedImages));
+
+          retrainModal.hide();
+
+          setTimeout(() => {
+            retrainingModal.show();
+            startTrainingProcess(formData);
+          }, 300);
+        });
+
+      // Start training process with real backend communication
+      async function startTrainingProcess(formData) {
+        const statusEl = document.getElementById("retrainingStatus");
+        const progressBar = document.getElementById("retrainProgress");
+        const logEl = document.getElementById("trainingLog");
+
+        logEl.innerHTML =
+          '<p class="text-primary">🚀 Starting training process...</p>';
+
+        try {
+          const response = await fetch(API_ENDPOINTS.retrain, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error("Training request failed");
+          }
+
+          // Use Server-Sent Events or polling to get real-time updates
+          // For now, we'll use polling
+          await pollTrainingProgress();
+        } catch (error) {
+          console.error("Training error:", error);
+          statusEl.textContent = "Training failed!";
+          logEl.innerHTML +=
+            '<p class="text-danger">❌ Error: ' + error.message + "</p>";
+
+          setTimeout(() => {
+            retrainingModal.hide();
+            alert("Training failed. Please try again.");
+          }, 2000);
+        }
+      }
+
+      // Poll training progress
+      async function pollTrainingProgress() {
+        const statusEl = document.getElementById("retrainingStatus");
+        const progressBar = document.getElementById("retrainProgress");
+        const logEl = document.getElementById("trainingLog");
+
+        let pollCount = 0;
+        const maxPolls = 60; // 5 minutes max
+
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+
+          try {
+            const response = await fetch("/training_status");
+            const data = await response.json();
+
+            // Update progress
+            const progress = data.progress || 0;
+            progressBar.style.width = progress + "%";
+            progressBar.textContent = progress + "%";
+
+            // Update status
+            if (data.status) {
+              statusEl.textContent = data.status;
+            }
+
+            // Update logs
+            if (data.logs && data.logs.length > 0) {
+              logEl.innerHTML = "";
+              data.logs.forEach((log) => {
+                const p = document.createElement("p");
+                if (log.includes("Epoch")) {
+                  p.className = "epoch-line";
+                } else if (
+                  log.includes("precision") ||
+                  log.includes("recall")
+                ) {
+                  p.className = "metric-line";
+                }
+                p.textContent = log;
+                logEl.appendChild(p);
+              });
+              logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            // Check if completed
+            if (data.completed) {
+              clearInterval(pollInterval);
+              currentTrainedModel = data.model;
+
+              setTimeout(() => {
+                retrainingModal.hide();
+                setTimeout(() => {
+                  showRetrainResults(currentTrainedModel);
+                  resultModal.show();
+                }, 300);
+              }, 500);
+            }
+
+            // Timeout check
+            if (pollCount >= maxPolls && !data.completed) {
+              clearInterval(pollInterval);
+              throw new Error("Training timeout");
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            console.error("Polling error:", error);
+            statusEl.textContent = "Error fetching training status";
+          }
+        }, 5000); // Poll every 5 seconds
+      }
+
+      // Show retrain results from backend
+      function showRetrainResults(model) {
+        document.getElementById("newModelName").textContent = model.name || "-";
+        document.getElementById("newVersion").textContent =
+          "v" + (model.version || "-");
+        document.getElementById("newPrecision").textContent =
+          ((model.pre || 0) * 100).toFixed(2) + "%";
+        document.getElementById("newRecall").textContent =
+          ((model.recall || 0) * 100).toFixed(2) + "%";
+        document.getElementById("newF1").textContent =
+          ((model.f1_score || 0) * 100).toFixed(2) + "%";
+        document.getElementById("sampleQty").textContent =
+          model.sample_quantity || "-";
+        document.getElementById("datasetId").textContent =
+          model.dataset_id || "-";
+        document.getElementById("modelPath").textContent = model.path || "-";
+      }
+
+      // Save model
+      document
+        .getElementById("saveModelBtn")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("saveModelBtn");
+
+          if (!currentTrainedModel) {
+            alert("No model data to save!");
+            return;
+          }
+
+          btn.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+          btn.disabled = true;
+
+          try {
+            const response = await fetch(API_ENDPOINTS.saveModel, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(currentTrainedModel),
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to save model");
+            }
+
+            const result = await response.json();
+
+            btn.innerHTML = "✓ Saved!";
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-success");
+
+            setTimeout(() => {
+              resultModal.hide();
+              setTimeout(() => {
+                alert(
+                  "Model saved successfully!\n\nThe new model has been saved to the database.\nPage will reload to show updated data."
+                );
+                location.reload();
+              }, 300);
+            }, 1000);
+          } catch (error) {
+            console.error("Save error:", error);
+            btn.innerHTML = "Save Model";
+            btn.disabled = false;
+            btn.classList.remove("btn-success");
+            btn.classList.add("btn-primary");
+            alert("Failed to save model: " + error.message);
+          }
+        });
+
+      // Initialize page on load
+      initPage();
+    </script>
+  </body>
+</html>
