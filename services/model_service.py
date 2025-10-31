@@ -1,19 +1,30 @@
-from models.traffic_sign_model import TrafficSignModel
+import shutil
 from dao.model_dao import ModelDAO
+import os
 from ultralytics import YOLO
 from datetime import datetime
-import controllers.model_controller
-import os
-import shutil
+from models.traffic_sign_model import TrafficSignModel
 import random
 
 class ModelService:
     def __init__(self):
-        self.dao = ModelDAO()
+        self.model_dao = ModelDAO()
 
-    def get_dataset(self):
-        dataset_info = controllers.model_controller.get_dataset_from_cloud()
-        return dataset_info["dataset_path"], dataset_info["yaml_path"]
+    def get_all_models(self):
+        models = self.model_dao.find_all()
+        models_list = []
+        for m in models:
+            models_list.append({
+                "name": m.name,
+                "version": m.version,
+                "pre": m.pre,
+                "recall": m.recall,
+                "f1_score": m.f1_score,
+                "sample_quantity": m.sample_quantity,
+                "dataset_id": m.dataset_id,
+                "path": m.path
+            })
+        return models_list
 
     def prepare_selected_dataset(self, selected_images):
         """

@@ -1,66 +1,95 @@
-from flask import Flask, render_template, jsonify, send_from_directory, request
-import os
-from controllers import model_controller
+from flask import Flask, render_template, jsonify, send_from_directory, request, session, redirect, url_for
+from utils.exceptions import NotFoundException, UnAuthException
 from services.model_service import ModelService
+from services.sample_service import SampleService
+from services.model_service import ModelService
+from services.dataset_service import DatasetService
+from services.admin_service import AdminService
+from utils.middleware import login_required
+import os
 
 app = Flask(__name__)
 
-@app.route("/traffic_sign_model")
+sample_service = SampleService()
+model_service = ModelService()
+dataset_service = DatasetService()
+admin_service = AdminService()
+
+@app.route("/traffic_sign_model", methods=['GET'])
+@login_required
 def traffic_sign_model():
     return render_template("traffic_sign_model.html")
 
-@app.route('/')
+@app.route('/', methods=['GET'])
+@login_required
 def home():
     return render_template('Home.html')
 
-@app.route('/manage_model')
-def manage_model():
-    return model_controller.get_models()
+@app.route('/models', methods=['GET'])
+@login_required
+def get_all_models():
+    models = model_service.get_all_models()
+    return jsonify({"models": models}), 200
 
-@app.route('/retrain', methods=['POST'])
-def retrain():
-    return model_controller.retrain_model()
-
-@app.route('/save_model', methods=['POST'])
-def save_model():
-    return model_controller.save_model()
-
-@app.route('/get_dataset', methods=['GET'])
-def get_dataset():
-    dataset_info = model_controller.get_datasets_from_cloud()
-    return dataset_info
-
-# 🆕 Route để lấy danh sách ảnh từ dataset/images
-@app.route('/get_images', methods=['GET'])
-def get_images():
-    datasets = model_controller.get_datasets_from_cloud()
-    return jsonify({"datasets": datasets})
-
-@app.route('/dataset/<int:dataset_id>/images/<filename>')
-def serve_image(dataset_id, filename):
-    datasets = model_controller.get_datasets_from_cloud()
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        return render_template('Login.html')
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    try:
+        admin = admin_service.login(username, password)
+        session["admin_id"] = admin.id
+        return jsonify({ 
+            "admin": {
+                "id": admin.id,
+                "username": admin.username,
+                "full_name": admin.full_name
+            },
+        }), 200
+    except UnAuthException as e:
+        return jsonify({"error": str(e)}), 401
+    except Exception as e:
+        return jsonify({"error": "Internal server error"}), 500
     
-    # Tìm dataset theo id
-    dataset = next((d for d in datasets if d["id"] == dataset_id), None)
-    if not dataset:
-        return "Dataset not found", 404
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    session.pop("admin_id", None)
+    return redirect(url_for('login'))
 
-    dataset_path = dataset["cloudPath"]
-    image_dir = os.path.join(dataset_path, "images")
-    return send_from_directory(image_dir, filename)
+@app.route('/datasets', methods=['GET'])
+@login_required
+def get_all_datasets():
+    datasets = dataset_service.get_all_datasets()
+    return jsonify({"datasets": datasets}), 200
 
-@app.route("/retrain_selected", methods=["POST"])
+@app.route('/samples/<int:id>', methods=['GET'])
+@login_required
+def get_sample_by_id(id):
+    try:
+        sample = sample_service.get_sample_by_id(id)
+        image_path = sample.image_path
+        directory = os.path.dirname(image_path)
+        filename = os.path.basename(image_path)
+        return send_from_directory(directory, filename)
+    except NotFoundException as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/models/<int:id>/retrain", methods=["PUT"])
+@login_required
 def retrain_selected():
     data = request.json
-    selected_images = data.get("images", [])
+    selected_images = data.get("images")
     if not selected_images:
         return jsonify({"error": "No images selected"}), 400
 
-    # 1️⃣ Tạo temporary dataset
-    dataset_path, yaml_path = ModelService.prepare_selected_dataset(selected_images)
+    dataset_path, yaml_path = model_service.prepare_selected_dataset(selected_images)
 
-    # 2️⃣ Train model
-    model = ModelService.retrain(dataset_path=dataset_path, yaml_path=yaml_path)
+    model = model_service.retrain(dataset_path=dataset_path, yaml_path=yaml_path)
 
     return jsonify({
         "name": model.name,
@@ -70,7 +99,6 @@ def retrain_selected():
         "f1_score": model.f1_score,
         "path": model.path
     })
-
 
 if __name__ == '__main__':
     app.run(debug=True)
