@@ -15,4 +15,17 @@ class TrafficSignModel(db.Model):
     sample_quantity = db.Column(db.Integer)
     dataset_id = db.Column(db.Integer, db.ForeignKey("tblTrafficSignDataset.id"))
     path = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'version': self.version,
+            'pre': self.pre,
+            'recall': self.recall,
+            'f1_score': self.f1_score,
+            'is_active': self.is_active,
+            'sample_quantity': self.sample_quantity,
+            'dataset_id': self.dataset_id,
+            'path': self.path
+        }

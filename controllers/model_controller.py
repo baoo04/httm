@@ -1,3 +1,4 @@
+from dao.dataset_dao import DatasetDAO
 from flask import render_template, request, jsonify
 from services.model_service import ModelService
 from dao.model_dao import ModelDAO
@@ -7,7 +8,19 @@ model_dao = ModelDAO()
 
 def get_models():
     models = model_dao.get_models()
-    return render_template('TrafficSignManage.html', models=models)
+    models_list = []
+    for m in models:
+        models_list.append({
+            "name": m.name,
+            "version": m.version,
+            "pre": m.pre,
+            "recall": m.recall,
+            "f1_score": m.f1_score,
+            "sample_quantity": m.sample_quantity,
+            "dataset_id": m.dataset_id,
+            "path": m.path
+        })
+    return jsonify(models_list)
 
 def retrain_model():
     dataset = model_service.get_dataset_from_cloud()
@@ -32,3 +45,9 @@ def save_model():
         "model_name": saved_model.name,
         "path": saved_model.path
     })
+
+def get_datasets_from_cloud():
+    dao = DatasetDAO()
+    datasets = dao.get_datasets()
+
+    return datasets

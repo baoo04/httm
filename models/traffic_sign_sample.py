@@ -8,3 +8,4 @@ class TrafficSignSample(db.Model):
     image_path = db.Column(db.String(255))
     admin_id = db.Column(db.Integer, db.ForeignKey("tblAdmin.id"))
     dataset_id = db.Column(db.Integer, db.ForeignKey("tblTrafficSignDataset.id"))
+    is_trained = db.Column(db.Boolean, default=False)

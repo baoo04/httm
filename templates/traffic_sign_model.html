@@ -184,6 +184,37 @@
       aria-labelledby="retrainModalLabel"
       aria-hidden="true"
     >
+      <div class="mb-3">
+        <label class="form-label">Select Dataset</label>
+        <select id="datasetSelect" class="form-select mb-3">
+          <option value="">-- Choose dataset --</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Select Images to Train</label>
+        <div class="mb-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            id="selectAllBtn"
+          >
+            Select All
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            id="deselectAllBtn"
+          >
+            Deselect All
+          </button>
+          <span class="ms-3 text-muted" id="selectedCount"
+            >0 images selected</span
+          >
+        </div>
+        <div class="image-grid" id="imageGrid"></div>
+      </div>
+
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
@@ -231,18 +262,6 @@
                   >
                 </div>
                 <div class="image-grid" id="imageGrid"></div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Upload Label File (.txt)</label>
-                <input
-                  type="file"
-                  class="form-control"
-                  id="labelFile"
-                  accept=".txt"
-                />
-                <small class="form-text text-muted"
-                  >Required: YOLO format label file</small
-                >
               </div>
               <button
                 type="button"
@@ -385,7 +404,7 @@
       const API_BASE = "";
       const API_ENDPOINTS = {
         getModels: "/manage_model",
-        getDataset: "/get_dataset",
+        getDataset: "/get_images",
         retrain: "/retrain",
         saveModel: "/save_model",
       };
@@ -402,7 +421,7 @@
       // Load models from backend
       async function loadModels() {
         try {
-          const response = await fetch(API_ENDPOINTS.getModels);
+          const response = await fetch("/manage_model");
           const models = await response.json();
 
           const tableBody = document.getElementById("modelTableBody");
@@ -458,6 +477,9 @@
       }
 
       // Load dataset from backend
+      let datasets = [];
+      let selectedImages = [];
+
       async function loadDatasetAndShowModal(modelName) {
         const loadingDiv = document.getElementById("loadingDataset");
         const imageGrid = document.getElementById("imageGrid");
@@ -472,26 +494,32 @@
 
           loadingDiv.style.display = "none";
 
-          // Display images from dataset
-          if (data.images && data.images.length > 0) {
-            data.images.forEach((img, i) => {
-              const div = document.createElement("div");
-              div.classList.add("image-item");
-              div.innerHTML = `
-                <input type="checkbox" id="img${i}" class="image-checkbox" data-path="${img}" />
-                <label for="img${i}">
-                  <img src="${img}" alt="sample${i}" />
-                </label>
-              `;
-              imageGrid.appendChild(div);
-            });
-          } else {
-            imageGrid.innerHTML =
-              '<p class="text-muted">No images available in dataset</p>';
+          const datasets = data.datasets || [];
+
+          if (datasets.length === 0) {
+            imageGrid.innerHTML = "<p>No dataset available</p>";
+            return;
           }
 
-          updateSelectedCount();
-          attachCheckboxListeners();
+          // 🔹 Tạo dropdown cho user chọn dataset
+          const datasetSelect = document.createElement("select");
+          datasetSelect.classList.add("form-select", "mb-3");
+          datasetSelect.innerHTML = `
+      <option value="">-- Select Dataset --</option>
+      ${datasets
+        .map((d) => `<option value="${d.id}">${d.name}</option>`)
+        .join("")}
+    `;
+          imageGrid.before(datasetSelect);
+
+          // 🔹 Khi user chọn dataset
+          datasetSelect.addEventListener("change", (e) => {
+            const selectedId = parseInt(e.target.value);
+            const selectedDataset = datasets.find((d) => d.id === selectedId);
+            if (!selectedDataset) return;
+
+            renderDatasetImages(selectedDataset);
+          });
         } catch (error) {
           console.error("Error loading dataset:", error);
           loadingDiv.style.display = "none";
@@ -499,26 +527,61 @@
         }
       }
 
-      // Attach checkbox listeners
+      function renderDatasetImages(dataset) {
+        const imageGrid = document.getElementById("imageGrid");
+        imageGrid.innerHTML = "";
+
+        if (dataset.images && dataset.images.length > 0) {
+          dataset.images.forEach((img, i) => {
+            const div = document.createElement("div");
+            div.classList.add("image-item");
+            div.innerHTML = `
+        <input type="checkbox" id="img${i}" class="image-checkbox" data-path="${
+              img.image_path
+            }" />
+        <label for="img${i}">
+          <img src="/dataset/${dataset.id}/images/${img.image_path
+              .split("\\")
+              .pop()}" alt="sample${i}" />
+        </label>
+      `;
+            imageGrid.appendChild(div);
+          });
+        } else {
+          imageGrid.innerHTML = `<p class="text-muted">No images available in ${dataset.name}</p>`;
+        }
+
+        updateSelectedCount();
+        attachCheckboxListeners();
+      }
+
+      // Checkbox logic
       function attachCheckboxListeners() {
-        document.querySelectorAll(".image-checkbox").forEach((checkbox) => {
-          checkbox.addEventListener("change", (e) => {
-            const parent = e.target.closest(".image-item");
+        document.querySelectorAll(".image-checkbox").forEach((cb) => {
+          cb.addEventListener("change", (e) => {
+            const path = e.target.dataset.path;
             if (e.target.checked) {
-              parent.classList.add("selected");
+              if (!selectedImages.includes(path)) selectedImages.push(path);
             } else {
-              parent.classList.remove("selected");
+              selectedImages = selectedImages.filter((i) => i !== path);
             }
             updateSelectedCount();
           });
         });
       }
 
-      // Select/Deselect all buttons
+      function updateSelectedCount() {
+        document.getElementById(
+          "selectedCount"
+        ).innerText = `${selectedImages.length} images selected`;
+      }
+
+      // Select all / Deselect all
       document.getElementById("selectAllBtn").addEventListener("click", () => {
         document.querySelectorAll(".image-checkbox").forEach((cb) => {
           cb.checked = true;
-          cb.closest(".image-item").classList.add("selected");
+          const path = cb.dataset.path;
+          if (!selectedImages.includes(path)) selectedImages.push(path);
         });
         updateSelectedCount();
       });
@@ -526,56 +589,30 @@
       document
         .getElementById("deselectAllBtn")
         .addEventListener("click", () => {
-          document.querySelectorAll(".image-checkbox").forEach((cb) => {
-            cb.checked = false;
-            cb.closest(".image-item").classList.remove("selected");
-          });
+          document
+            .querySelectorAll(".image-checkbox")
+            .forEach((cb) => (cb.checked = false));
+          selectedImages = [];
           updateSelectedCount();
         });
 
-      function updateSelectedCount() {
-        const count = document.querySelectorAll(
-          ".image-checkbox:checked"
-        ).length;
-        document.getElementById(
-          "selectedCount"
-        ).textContent = `${count} images selected`;
-      }
-
-      // Start retraining
+      // Khi nhấn “Start Retraining”
       document
         .getElementById("startRetrainBtn")
         .addEventListener("click", async () => {
-          const labelFile = document.getElementById("labelFile").files[0];
-          const selectedCheckboxes = document.querySelectorAll(
-            ".image-checkbox:checked"
-          );
-
-          if (selectedCheckboxes.length === 0) {
+          if (selectedImages.length === 0) {
             alert("Please select at least one image!");
             return;
           }
 
-          if (!labelFile) {
-            alert("Please upload a label file!");
-            return;
-          }
+          const res = await fetch("/retrain_selected", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images: selectedImages }),
+          });
 
-          // Prepare form data
-          const formData = new FormData();
-          formData.append("label_file", labelFile);
-
-          const selectedImages = Array.from(selectedCheckboxes).map(
-            (cb) => cb.dataset.path
-          );
-          formData.append("selected_images", JSON.stringify(selectedImages));
-
-          retrainModal.hide();
-
-          setTimeout(() => {
-            retrainingModal.show();
-            startTrainingProcess(formData);
-          }, 300);
+          const result = await res.json();
+          alert("Retrain completed: " + JSON.stringify(result));
         });
 
       // Start training process with real backend communication
@@ -756,7 +793,6 @@
           }
         });
 
-      // Initialize page on load
       initPage();
     </script>
   </body>
