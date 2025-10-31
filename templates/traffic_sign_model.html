@@ -70,32 +70,6 @@
         background-color: #0d6efd;
         color: white;
       }
-      .image-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 10px;
-      }
-      .image-item {
-        position: relative;
-      }
-      .image-item img {
-        width: 100%;
-        height: 80px;
-        object-fit: cover;
-        border-radius: 6px;
-        border: 2px solid transparent;
-        cursor: pointer;
-      }
-      .image-item input[type="checkbox"] {
-        position: absolute;
-        top: 5px;
-        left: 5px;
-        transform: scale(1.2);
-        z-index: 10;
-      }
-      .image-item.selected img {
-        border-color: #0d6efd;
-      }
       .training-log {
         background: #f8f9fa;
         border: 1px solid #dee2e6;
@@ -164,6 +138,7 @@
       <table class="table table-bordered table-striped">
         <thead>
           <tr>
+            <th>Id</th>
             <th>Model Name</th>
             <th>Precision</th>
             <th>Recall</th>
@@ -184,43 +159,10 @@
       aria-labelledby="retrainModalLabel"
       aria-hidden="true"
     >
-      <div class="mb-3">
-        <label class="form-label">Select Dataset</label>
-        <select id="datasetSelect" class="form-select mb-3">
-          <option value="">-- Choose dataset --</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Select Images to Train</label>
-        <div class="mb-2">
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-primary"
-            id="selectAllBtn"
-          >
-            Select All
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary"
-            id="deselectAllBtn"
-          >
-            Deselect All
-          </button>
-          <span class="ms-3 text-muted" id="selectedCount"
-            >0 images selected</span
-          >
-        </div>
-        <div class="image-grid" id="imageGrid"></div>
-      </div>
-
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog modal-xl">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="retrainModalLabel">
-              Retrain Model - Select Dataset
-            </h5>
+            <h5 class="modal-title" id="retrainModalLabel">Retrain Model</h5>
             <button
               type="button"
               class="btn-close btn-close-white"
@@ -228,21 +170,22 @@
               aria-label="Close"
             ></button>
           </div>
+
           <div class="modal-body">
-            <div
-              id="loadingDataset"
-              class="text-center mb-3"
-              style="display: none"
-            >
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              <p class="mt-2">Loading dataset from cloud...</p>
+            <!-- Dataset selection -->
+            <div class="mb-4">
+              <label class="form-label fw-bold">Select Dataset</label>
+              <select id="datasetSelect" class="form-select">
+                <option value="">-- Select a dataset --</option>
+              </select>
             </div>
-            <form id="retrainForm">
-              <div class="mb-3">
-                <label class="form-label">Select Images to Train</label>
-                <div class="mb-2">
+
+            <!-- Image selection area -->
+            <div id="imageSection" style="display: none">
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <div>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary"
@@ -257,20 +200,31 @@
                   >
                     Deselect All
                   </button>
-                  <span class="ms-3 text-muted" id="selectedCount"
-                    >0 images selected</span
-                  >
                 </div>
-                <div class="image-grid" id="imageGrid"></div>
+                <span class="text-muted" id="selectedCount"
+                  >0 images selected</span
+                >
               </div>
-              <button
-                type="button"
-                class="btn btn-primary w-100"
-                id="startRetrainBtn"
-              >
-                Start Retraining
-              </button>
-            </form>
+
+              <div
+                id="imageGrid"
+                class="d-grid"
+                style="
+                  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                  gap: 10px;
+                "
+              ></div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary w-100"
+              id="startRetrainBtn"
+            >
+              Start Retraining
+            </button>
           </div>
         </div>
       </div>
@@ -403,42 +357,51 @@
       // API endpoints
       const API_BASE = "";
       const API_ENDPOINTS = {
-        getModels: "/manage_model",
-        getDataset: "/get_images",
+        getModels: "/models",
+        getDataset: "/datasets",
         retrain: "/retrain",
         saveModel: "/save_model",
       };
 
+      // Global state variables
       let currentTrainedModel = null;
+      let currentDatasetId = null;
+      let currentModelId = null;
+      let selectedImages = new Set();
+      let allDatasets = [];
       let retrainModal, retrainingModal, resultModal;
 
       // Initialize page
       async function initPage() {
         await loadModels();
         initializeModals();
+        setupEventListeners();
       }
 
       // Load models from backend
       async function loadModels() {
         try {
-          const response = await fetch("/manage_model");
-          const models = await response.json();
+          const response = await fetch("/models");
+          const res = await response.json();
+
+          console.log(res);
 
           const tableBody = document.getElementById("modelTableBody");
           tableBody.innerHTML = "";
 
-          models.forEach((model, index) => {
+          res.models.forEach((model, index) => {
             const row = document.createElement("tr");
             row.innerHTML = `
+              <td>${model.id}</td>
               <td>${model.name}</td>
               <td>${(model.pre * 100).toFixed(1)}%</td>
               <td>${(model.recall * 100).toFixed(1)}%</td>
               <td>${(model.f1_score * 100).toFixed(1)}%</td>
               <td>v${model.version}</td>
               <td>
-                <button class="btn btn-sm btn-primary retrain-btn" data-model="${
-                  model.name
-                }" data-index="${index}">
+                <button class="btn btn-sm btn-primary retrain-btn"
+                        data-model-id="${model.id}"
+                        data-model-name="${model.name}">
                   Retrain
                 </button>
               </td>
@@ -451,6 +414,24 @@
           console.error("Error loading models:", error);
           alert("Failed to load models. Please refresh the page.");
         }
+      }
+
+      // Attach event listeners to retrain buttons
+      function attachRetrainListeners() {
+        document.querySelectorAll(".retrain-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const modelId = btn.getAttribute("data-model-id");
+            const modelName = btn.getAttribute("data-model-name");
+            currentModelId = modelId;
+            console.log(
+              "Selected model ID:",
+              currentModelId,
+              "Name:",
+              modelName
+            );
+            await openRetrainModal(modelName);
+          });
+        });
       }
 
       // Initialize Bootstrap modals
@@ -466,263 +447,229 @@
         );
       }
 
-      // Attach retrain button listeners
-      function attachRetrainListeners() {
-        document.querySelectorAll(".retrain-btn").forEach((btn) => {
-          btn.addEventListener("click", async (e) => {
-            const modelName = e.target.dataset.model;
-            await loadDatasetAndShowModal(modelName);
+      // Load dataset list for dropdown
+      async function loadDatasets() {
+        try {
+          const res = await fetch("/datasets");
+          const data = await res.json();
+          allDatasets = data.datasets || [];
+
+          const select = document.getElementById("datasetSelect");
+          select.innerHTML = '<option value="">-- Select a dataset --</option>';
+          allDatasets.forEach((ds) => {
+            const option = document.createElement("option");
+            option.value = ds.id;
+            option.textContent = ds.name;
+            select.appendChild(option);
           });
-        });
+        } catch (err) {
+          console.error("Error loading datasets:", err);
+          alert("Failed to load datasets.");
+        }
       }
 
-      // Load dataset from backend
-      let datasets = [];
-      let selectedImages = [];
+      // Open retrain modal
+      async function openRetrainModal(modelName) {
+        // Reset state
+        currentDatasetId = null;
+        selectedImages.clear();
+        document.getElementById("imageSection").style.display = "none";
+        document.getElementById("imageGrid").innerHTML = "";
+        updateSelectedCount();
 
-      async function loadDatasetAndShowModal(modelName) {
-        const loadingDiv = document.getElementById("loadingDataset");
-        const imageGrid = document.getElementById("imageGrid");
+        // Load datasets if not already loaded
+        if (allDatasets.length === 0) {
+          await loadDatasets();
+        }
 
-        imageGrid.innerHTML = "";
-        loadingDiv.style.display = "block";
         retrainModal.show();
+      }
 
-        try {
-          const response = await fetch(API_ENDPOINTS.getDataset);
-          const data = await response.json();
+      // Update selected image count
+      function updateSelectedCount() {
+        const count = document.querySelectorAll(
+          "#imageGrid .overlay:not(.d-none)"
+        ).length;
+        document.getElementById(
+          "selectedCount"
+        ).textContent = `${count} images selected`;
+      }
 
-          loadingDiv.style.display = "none";
+      // Setup event listeners
+      function setupEventListeners() {
+        const datasetSelect = document.getElementById("datasetSelect");
+        const imageSection = document.getElementById("imageSection");
+        const imageGrid = document.getElementById("imageGrid");
+        const selectAllBtn = document.getElementById("selectAllBtn");
+        const deselectAllBtn = document.getElementById("deselectAllBtn");
+        const startRetrainBtn = document.getElementById("startRetrainBtn");
+        const saveModelBtn = document.getElementById("saveModelBtn");
 
-          const datasets = data.datasets || [];
+        // Dataset selection change
+        datasetSelect.addEventListener("change", () => {
+          const datasetId = parseInt(datasetSelect.value);
+          currentDatasetId = datasetId;
 
-          if (datasets.length === 0) {
-            imageGrid.innerHTML = "<p>No dataset available</p>";
+          if (!datasetId) {
+            imageSection.style.display = "none";
             return;
           }
 
-          // 🔹 Tạo dropdown cho user chọn dataset
-          const datasetSelect = document.createElement("select");
-          datasetSelect.classList.add("form-select", "mb-3");
-          datasetSelect.innerHTML = `
-      <option value="">-- Select Dataset --</option>
-      ${datasets
-        .map((d) => `<option value="${d.id}">${d.name}</option>`)
-        .join("")}
-    `;
-          imageGrid.before(datasetSelect);
+          const dataset = allDatasets.find((d) => d.id === datasetId);
+          if (!dataset) return;
 
-          // 🔹 Khi user chọn dataset
-          datasetSelect.addEventListener("change", (e) => {
-            const selectedId = parseInt(e.target.value);
-            const selectedDataset = datasets.find((d) => d.id === selectedId);
-            if (!selectedDataset) return;
+          // Clear and populate image grid
+          imageGrid.innerHTML = "";
+          selectedImages.clear();
 
-            renderDatasetImages(selectedDataset);
-          });
-        } catch (error) {
-          console.error("Error loading dataset:", error);
-          loadingDiv.style.display = "none";
-          alert("Failed to load dataset from cloud.");
-        }
-      }
-
-      function renderDatasetImages(dataset) {
-        const imageGrid = document.getElementById("imageGrid");
-        imageGrid.innerHTML = "";
-
-        if (dataset.images && dataset.images.length > 0) {
-          dataset.images.forEach((img, i) => {
+          dataset.images.forEach((image) => {
             const div = document.createElement("div");
-            div.classList.add("image-item");
+            div.className = "position-relative border rounded";
+            div.style.width = "120px";
+            div.style.height = "120px";
+            div.style.overflow = "hidden";
+            div.style.cursor = "pointer";
+            div.dataset.imageId = image.id;
+
             div.innerHTML = `
-        <input type="checkbox" id="img${i}" class="image-checkbox" data-path="${
-              img.image_path
-            }" />
-        <label for="img${i}">
-          <img src="/dataset/${dataset.id}/images/${img.image_path
-              .split("\\")
-              .pop()}" alt="sample${i}" />
-        </label>
-      `;
+              <img src="/samples/${image.id}" class="img-fluid w-100 h-100 object-fit-cover">
+              <div class="overlay position-absolute top-0 start-0 w-100 h-100 bg-primary bg-opacity-50 d-none"></div>
+            `;
+
+            div.addEventListener("click", () => {
+              const overlay = div.querySelector(".overlay");
+              overlay.classList.toggle("d-none");
+
+              if (!overlay.classList.contains("d-none")) {
+                selectedImages.add(image.id);
+              } else {
+                selectedImages.delete(image.id);
+              }
+
+              updateSelectedCount();
+            });
+
             imageGrid.appendChild(div);
           });
-        } else {
-          imageGrid.innerHTML = `<p class="text-muted">No images available in ${dataset.name}</p>`;
-        }
 
-        updateSelectedCount();
-        attachCheckboxListeners();
-      }
-
-      // Checkbox logic
-      function attachCheckboxListeners() {
-        document.querySelectorAll(".image-checkbox").forEach((cb) => {
-          cb.addEventListener("change", (e) => {
-            const path = e.target.dataset.path;
-            if (e.target.checked) {
-              if (!selectedImages.includes(path)) selectedImages.push(path);
-            } else {
-              selectedImages = selectedImages.filter((i) => i !== path);
-            }
-            updateSelectedCount();
-          });
-        });
-      }
-
-      function updateSelectedCount() {
-        document.getElementById(
-          "selectedCount"
-        ).innerText = `${selectedImages.length} images selected`;
-      }
-
-      // Select all / Deselect all
-      document.getElementById("selectAllBtn").addEventListener("click", () => {
-        document.querySelectorAll(".image-checkbox").forEach((cb) => {
-          cb.checked = true;
-          const path = cb.dataset.path;
-          if (!selectedImages.includes(path)) selectedImages.push(path);
-        });
-        updateSelectedCount();
-      });
-
-      document
-        .getElementById("deselectAllBtn")
-        .addEventListener("click", () => {
-          document
-            .querySelectorAll(".image-checkbox")
-            .forEach((cb) => (cb.checked = false));
-          selectedImages = [];
+          imageSection.style.display = "block";
           updateSelectedCount();
         });
 
-      // Khi nhấn “Start Retraining”
-      document
-        .getElementById("startRetrainBtn")
-        .addEventListener("click", async () => {
-          if (selectedImages.length === 0) {
-            alert("Please select at least one image!");
+        // Select all button
+        selectAllBtn.addEventListener("click", () => {
+          document
+            .querySelectorAll("#imageGrid .overlay")
+            .forEach((overlay) => {
+              overlay.classList.remove("d-none");
+              const imageId = parseInt(overlay.closest("div").dataset.imageId);
+              selectedImages.add(imageId);
+            });
+          updateSelectedCount();
+        });
+
+        // Deselect all button
+        deselectAllBtn.addEventListener("click", () => {
+          document
+            .querySelectorAll("#imageGrid .overlay")
+            .forEach((overlay) => {
+              overlay.classList.add("d-none");
+            });
+          selectedImages.clear();
+          updateSelectedCount();
+        });
+
+        // Start retraining button
+        startRetrainBtn.addEventListener("click", async () => {
+          if (!currentDatasetId || selectedImages.size === 0) {
+            alert("Please select a dataset and at least one image!");
             return;
           }
 
-          const res = await fetch("/retrain_selected", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ images: selectedImages }),
-          });
+          const payload = {
+            dataset_id: currentDatasetId,
+            image_ids: Array.from(selectedImages),
+          };
 
-          const result = await res.json();
-          alert("Retrain completed: " + JSON.stringify(result));
-        });
-
-      // Start training process with real backend communication
-      async function startTrainingProcess(formData) {
-        const statusEl = document.getElementById("retrainingStatus");
-        const progressBar = document.getElementById("retrainProgress");
-        const logEl = document.getElementById("trainingLog");
-
-        logEl.innerHTML =
-          '<p class="text-primary">🚀 Starting training process...</p>';
-
-        try {
-          const response = await fetch(API_ENDPOINTS.retrain, {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error("Training request failed");
-          }
-
-          // Use Server-Sent Events or polling to get real-time updates
-          // For now, we'll use polling
-          await pollTrainingProgress();
-        } catch (error) {
-          console.error("Training error:", error);
-          statusEl.textContent = "Training failed!";
-          logEl.innerHTML +=
-            '<p class="text-danger">❌ Error: ' + error.message + "</p>";
-
-          setTimeout(() => {
-            retrainingModal.hide();
-            alert("Training failed. Please try again.");
-          }, 2000);
-        }
-      }
-
-      // Poll training progress
-      async function pollTrainingProgress() {
-        const statusEl = document.getElementById("retrainingStatus");
-        const progressBar = document.getElementById("retrainProgress");
-        const logEl = document.getElementById("trainingLog");
-
-        let pollCount = 0;
-        const maxPolls = 60; // 5 minutes max
-
-        const pollInterval = setInterval(async () => {
-          pollCount++;
+          startRetrainBtn.disabled = true;
+          startRetrainBtn.textContent = "Retraining...";
 
           try {
-            const response = await fetch("/training_status");
-            const data = await response.json();
+            const res = await fetch(`/models/${currentModelId}/retrain`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
 
-            // Update progress
-            const progress = data.progress || 0;
-            progressBar.style.width = progress + "%";
-            progressBar.textContent = progress + "%";
+            const result = await res.json();
 
-            // Update status
-            if (data.status) {
-              statusEl.textContent = data.status;
+            if (res.ok) {
+              currentTrainedModel = result;
+              retrainModal.hide();
+              showRetrainResults(result);
+              resultModal.show();
+            } else {
+              alert("⚠️ Error: " + (result.error || "Retrain failed"));
             }
-
-            // Update logs
-            if (data.logs && data.logs.length > 0) {
-              logEl.innerHTML = "";
-              data.logs.forEach((log) => {
-                const p = document.createElement("p");
-                if (log.includes("Epoch")) {
-                  p.className = "epoch-line";
-                } else if (
-                  log.includes("precision") ||
-                  log.includes("recall")
-                ) {
-                  p.className = "metric-line";
-                }
-                p.textContent = log;
-                logEl.appendChild(p);
-              });
-              logEl.scrollTop = logEl.scrollHeight;
-            }
-
-            // Check if completed
-            if (data.completed) {
-              clearInterval(pollInterval);
-              currentTrainedModel = data.model;
-
-              setTimeout(() => {
-                retrainingModal.hide();
-                setTimeout(() => {
-                  showRetrainResults(currentTrainedModel);
-                  resultModal.show();
-                }, 300);
-              }, 500);
-            }
-
-            // Timeout check
-            if (pollCount >= maxPolls && !data.completed) {
-              clearInterval(pollInterval);
-              throw new Error("Training timeout");
-            }
-          } catch (error) {
-            clearInterval(pollInterval);
-            console.error("Polling error:", error);
-            statusEl.textContent = "Error fetching training status";
+          } catch (err) {
+            console.error(err);
+            alert("An unexpected error occurred.");
+          } finally {
+            startRetrainBtn.disabled = false;
+            startRetrainBtn.textContent = "Start Retraining";
           }
-        }, 5000); // Poll every 5 seconds
+        });
+
+        // Save model button
+        saveModelBtn.addEventListener("click", async () => {
+          if (!currentTrainedModel) {
+            alert("No model data to save!");
+            return;
+          }
+
+          saveModelBtn.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+          saveModelBtn.disabled = true;
+
+          try {
+            const response = await fetch(`/models/${currentModelId}/save`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to save model");
+            }
+
+            const result = await response.json();
+
+            saveModelBtn.innerHTML = "✓ Saved!";
+            saveModelBtn.classList.remove("btn-primary");
+            saveModelBtn.classList.add("btn-success");
+
+            setTimeout(() => {
+              resultModal.hide();
+              setTimeout(() => {
+                alert(
+                  "Model saved successfully!\n\nThe new model has been saved to the database.\nPage will reload to show updated data."
+                );
+                location.reload();
+              }, 300);
+            }, 1000);
+          } catch (error) {
+            console.error("Save error:", error);
+            saveModelBtn.innerHTML = "Save Model";
+            saveModelBtn.disabled = false;
+            saveModelBtn.classList.remove("btn-success");
+            saveModelBtn.classList.add("btn-primary");
+            alert("Failed to save model: " + error.message);
+          }
+        });
       }
 
-      // Show retrain results from backend
+      // Show retrain results
       function showRetrainResults(model) {
         document.getElementById("newModelName").textContent = model.name || "-";
         document.getElementById("newVersion").textContent =
@@ -740,59 +687,7 @@
         document.getElementById("modelPath").textContent = model.path || "-";
       }
 
-      // Save model
-      document
-        .getElementById("saveModelBtn")
-        .addEventListener("click", async () => {
-          const btn = document.getElementById("saveModelBtn");
-
-          if (!currentTrainedModel) {
-            alert("No model data to save!");
-            return;
-          }
-
-          btn.innerHTML =
-            '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-          btn.disabled = true;
-
-          try {
-            const response = await fetch(API_ENDPOINTS.saveModel, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(currentTrainedModel),
-            });
-
-            if (!response.ok) {
-              throw new Error("Failed to save model");
-            }
-
-            const result = await response.json();
-
-            btn.innerHTML = "✓ Saved!";
-            btn.classList.remove("btn-primary");
-            btn.classList.add("btn-success");
-
-            setTimeout(() => {
-              resultModal.hide();
-              setTimeout(() => {
-                alert(
-                  "Model saved successfully!\n\nThe new model has been saved to the database.\nPage will reload to show updated data."
-                );
-                location.reload();
-              }, 300);
-            }, 1000);
-          } catch (error) {
-            console.error("Save error:", error);
-            btn.innerHTML = "Save Model";
-            btn.disabled = false;
-            btn.classList.remove("btn-success");
-            btn.classList.add("btn-primary");
-            alert("Failed to save model: " + error.message);
-          }
-        });
-
+      // Initialize the page
       initPage();
     </script>
   </body>

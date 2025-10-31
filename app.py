@@ -2,13 +2,13 @@ from flask import Flask, render_template, jsonify, send_from_directory, request,
 from utils.exceptions import NotFoundException, UnAuthException
 from services.model_service import ModelService
 from services.sample_service import SampleService
-from services.model_service import ModelService
 from services.dataset_service import DatasetService
 from services.admin_service import AdminService
 from utils.middleware import login_required
 import os
 
 app = Flask(__name__)
+app.secret_key = 'your_super_secret_key'
 
 sample_service = SampleService()
 model_service = ModelService()
@@ -33,8 +33,8 @@ def get_all_models():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        return render_template('Login.html')
+    if request.method == 'GET':
+        return render_template('login.html')
     data = request.json
     username = data.get("username")
     password = data.get("password")
@@ -51,6 +51,7 @@ def login():
     except UnAuthException as e:
         return jsonify({"error": str(e)}), 401
     except Exception as e:
+        print(e)
         return jsonify({"error": "Internal server error"}), 500
     
 @app.route('/logout', methods=['POST'])
@@ -81,24 +82,26 @@ def get_sample_by_id(id):
     
 @app.route("/models/<int:id>/retrain", methods=["PUT"])
 @login_required
-def retrain_selected():
+def retrain(id):
     data = request.json
-    selected_images = data.get("images")
-    if not selected_images:
+    image_ids = data.get("image_ids")
+    dataset_id = data.get("dataset_id")
+    if not image_ids or len(image_ids) == 0 or not dataset_id:
         return jsonify({"error": "No images selected"}), 400
 
-    dataset_path, yaml_path = model_service.prepare_selected_dataset(selected_images)
+    model = model_service.retrain(id, image_ids=image_ids, dataset_id=dataset_id)
 
-    model = model_service.retrain(dataset_path=dataset_path, yaml_path=yaml_path)
+    return jsonify(model.to_dict())
 
-    return jsonify({
-        "name": model.name,
-        "version": model.version,
-        "precision": model.pre,
-        "recall": model.recall,
-        "f1_score": model.f1_score,
-        "path": model.path
-    })
+@app.route("/models/<int:id>/save", methods=["POST"])
+@login_required
+def save_trained_model(id):
+    try:
+        model = model_service.save_trained_model(id)
+        session.pop("pending_model", None)
+        return jsonify(model.to_dict())
+    except NotFoundException as e:
+        return jsonify({"error": str(e)}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)

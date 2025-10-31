@@ -7,3 +7,4 @@ class TrafficSignDataset(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255))
     cloudPath = db.Column(db.String(255))
+    yaml_path = db.Column(db.String(255))

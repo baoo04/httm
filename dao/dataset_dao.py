@@ -14,7 +14,7 @@ class DatasetDAO:
 
         for dataset_row in dataset_rows:
             dataset = TrafficSignDataset(**dataset_row)
-            images = sample_dao.get_images(dataset.id)
+            images = sample_dao.find_all_by_dataset_id(dataset.id)
 
             image_dicts = []
             for img in images:
@@ -29,3 +29,14 @@ class DatasetDAO:
         cursor.close()
         conn.close()
         return datasets
+    
+    def find_by_id(self, id):
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM tblTrafficSignDataset WHERE id=%s LIMIT 1", (id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if row:
+            return TrafficSignDataset(**row)
+        return None
