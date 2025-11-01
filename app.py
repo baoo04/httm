@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, send_from_directory, request, session, redirect, url_for
+from flask import Flask, Response, render_template, jsonify, send_from_directory, request, session, redirect, stream_with_context, url_for
 from utils.exceptions import NotFoundException, UnAuthException
 from services.model_service import ModelService
 from services.sample_service import SampleService
@@ -80,18 +80,31 @@ def get_sample_by_id(id):
     except Exception as e:
         return jsonify({"error": "Internal server error"}), 500
     
-@app.route("/models/<int:id>/retrain", methods=["PUT"])
+@app.route("/models/<int:id>/retrain", methods=["POST"])
 @login_required
 def retrain(id):
     data = request.json
     image_ids = data.get("image_ids")
     dataset_id = data.get("dataset_id")
+    
     if not image_ids or len(image_ids) == 0 or not dataset_id:
         return jsonify({"error": "No images selected"}), 400
+    
+    session_id = model_service.retrain(id, dataset_id, image_ids)
 
-    model = model_service.retrain(id, image_ids=image_ids, dataset_id=dataset_id)
+    return jsonify({"session_id": session_id}), 200
 
-    return jsonify(model.to_dict())
+@app.route("/models/retrain/process/<session_id>")
+@login_required
+def retrain_process(session_id):
+    return Response(
+        stream_with_context(model_service.get_training_progress(session_id)),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.route("/models/<int:id>/save", methods=["POST"])
 @login_required
